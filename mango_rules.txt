@@ -9,9 +9,9 @@ anon_fn ::= "(" anon_fn_params ")" "=>" "{" "}"
 anon_fn_params ::= IDENTIFIER ("," IDENTIFIER)*
 
 logical_or ::= comparison ("||" comparison)*
-logical_and ::= comparison ("&&" comparison)*
-
-comparison ::= term ("<" | ">" | "<=" | ">=" | "!=" | "==" | "!==" | "===" term)*
+logical_and ::= equality ("&&" equality)*
+equality ::= comparison ("==" | "!=" | "===" | "!==" comparison)*
+comparison ::= term ("<" | ">" | "<=" | ">=" term)*
 term ::= factor ("+" | "-" factor)*
 factor ::= unary ("*" | "/" unary)*
 unary ::= ("-" | "!") unary | get
