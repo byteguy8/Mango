@@ -1,0 +1,497 @@
+class list{
+    init(){
+        this.ptr = 0;
+        this.buffer = []:8;
+    }
+
+    fn copy(from, to){
+        var from_len = len(from);
+
+        var i = 0;
+
+        while(i < from_len){
+            to[i] = from[i];
+
+            i = i + 1;
+        }
+    }
+
+    fn grow(){
+        var new_buffer = []:len(buffer) * 2;
+
+        copy(buffer, new_buffer);
+
+        buffer = new_buffer;
+    }
+
+    fn size(){
+        return ptr;
+    }
+
+    fn insert(value){
+        if(ptr >= len(buffer)){
+            grow();
+        }
+
+        buffer[ptr] = value;
+
+        ptr = ptr + 1;
+    }
+
+    fn get(index){
+        if(index >= ptr){
+            panic("Index out of bounds");
+        }
+
+        return buffer[index];
+    }
+}
+
+//> token types
+var PLUS_TOKTYPE = 0;
+var MINUS_TOKTYPE = 1;
+var SLASH_TOKTYPE = 2;
+var ASTERISK_TOKTYPE = 3;
+var EXPR_TOKTYPE = 4;
+
+var LEFT_PAREN_TOKTYPE = 5;
+var RIGHT_PAREN_TOKTYPE = 6;
+
+var NUMBER_TOKTYPE = 7;
+
+var EOF_TOKTYPE = 8;
+//< token types
+
+class token{
+    init(line, lexeme, literal, type){
+        this.line = line;
+        this.lexeme = lexeme;
+        this.literal = literal;
+        this.type = type;
+    }
+
+    fn token_str(){
+        print "line: " + to_str(line) + " lexeme: " + to_str(lexeme) + " literal: " + to_str(literal);
+    }
+}
+
+class scanner{
+    fn compare_chars(a, b){
+        return char_code(a) == char_code(b);
+    }
+
+    fn char_to_digit(c){
+        return char_code(c) - 48;
+    }
+
+    fn is_at_end(){
+        return current >= len(source);
+    }
+
+    fn is_digit(c){
+        var code = char_to_digit(c);
+
+        return code >= 0 && code <= 9;
+    }
+
+    fn advance(){
+        if(is_at_end()){
+            return "\0";
+        }
+
+        var ptr = current;
+        current = current + 1;
+
+        return source[ptr];
+    }
+
+    fn peek(){
+        if(is_at_end()){
+            return "\0";
+        }
+
+        return source[current];
+    }
+
+    fn match(c){
+        if(compare_chars(peek(), c)){
+            advance();
+            return true;
+        }
+
+        return false;
+    }
+
+    fn add_token_literal(type, literal){
+        var lexeme = sub_str(source, start, current - 1);
+        var tk = token(line, lexeme, literal, type);
+
+        tokens.insert(tk);
+    }
+
+    fn add_token(type){
+        add_token_literal(type, nil);
+    }
+
+    fn number(){
+        while(is_digit(peek())){
+            advance();
+        }
+
+        if(compare_chars(peek(), ".")){
+            advance();
+
+            while(is_digit(peek())){
+                advance();
+            }
+        }
+
+        var raw_literal = sub_str(source, start, current - 1);
+        var literal = to_float(raw_literal);
+
+        add_token_literal(NUMBER_TOKTYPE, literal);
+    }
+
+    fn scan_token(){
+        var c = advance();
+
+        if(compare_chars(c, "+")){
+            add_token(PLUS_TOKTYPE);
+        }elif(compare_chars(c, "-")){
+            add_token(MINUS_TOKTYPE);
+        }elif(compare_chars(c, "*")){
+            if(match("*")){
+                add_token(EXPR_TOKTYPE);
+            }else{
+                add_token(ASTERISK_TOKTYPE);
+            }
+        }elif(compare_chars(c, "/")){
+            add_token(SLASH_TOKTYPE);
+        }elif(compare_chars(c, "(")){
+            add_token(LEFT_PAREN_TOKTYPE);
+        }elif(compare_chars(c, ")")){
+            add_token(RIGHT_PAREN_TOKTYPE);
+        }elif(compare_chars(c, " ")){
+            return;
+        }elif(compare_chars(c, "\t")){
+            return;
+        }elif(compare_chars(c, "\n")){
+            line = line + 1;
+        }else{
+            if(is_digit(c)){
+                number();
+            }else{
+                panic("Unknown token: " + to_str(char_code(c)));
+            }
+        }
+    }
+
+    fn scan(source){
+        this.line = 1;
+        this.start = 0;
+        this.current = 0;
+        this.source = source;
+        this.tokens = list();
+
+        while(!is_at_end()){
+            scan_token();
+            start = current;
+        }
+
+        tokens.insert(token(line, nil, nil, EOF_TOKTYPE));
+
+        return tokens;
+    }
+}
+
+//> expressions type
+var BINARY_EXPRTYPE = 0;
+var UNARY_EXPRTYPE = 1;
+var GROUP_EXPRTYPE = 2;
+var LITERAL_EXPRTYPE = 3;
+//< expressions type
+
+class binary_expr{
+    init(left, operator, right){
+        this.left = left;
+        this.operator = operator;
+        this.right = right;
+    }
+}
+
+class unary_expr{
+    init(operator, right){
+        this.operator = operator;
+        this.right = right;
+    }
+}
+
+class group_expr{
+    init(e){
+        this.e = e;
+    }
+}
+
+class literal{
+    init(value){
+        this.value = value;
+    }
+}
+
+class expr{
+    init(type, e){
+        this.type = type;
+        this.e = e;
+    }
+}
+
+class parser{
+    fn is_at_end(){
+        return tokens.get(current).type == EOF_TOKTYPE;
+    }
+
+    fn peek(){
+        return tokens.get(current);
+    }
+
+    fn previous(){
+        return tokens.get(current - 1);
+    }
+
+    fn advance(){
+        var ptr = current;
+
+        current = current + 1;
+
+        return tokens.get(ptr);
+    }
+
+    fn match(types){
+        var token = peek();
+
+        var i = 0;
+
+        while(i < len(types)){
+            if(types[i] == token.type){
+                advance();
+                return true;
+            }
+
+            i = i + 1;
+        }
+
+        return false;
+    }
+
+    fn consume(type, err_msg){
+        var tk = peek();
+
+        if(type == tk.type){
+            advance();
+            return tk;
+        }
+
+        panic(err_msg);
+    }
+
+    fn parse_expr(){
+        return parse_term_expr();
+    }
+
+    fn parse_term_expr(){
+        var left = parse_factor_expr();
+
+        while(match([PLUS_TOKTYPE, MINUS_TOKTYPE])){
+            var operator = previous();
+            var right = parse_factor_expr();
+
+            var e = binary_expr(left, operator, right);
+            left = expr(BINARY_EXPRTYPE, e);
+        }
+
+        return left;
+    }
+
+    fn parse_factor_expr(){
+        var left = parse_exp_expr();
+
+        while(match([ASTERISK_TOKTYPE, SLASH_TOKTYPE, LEFT_PAREN_TOKTYPE])){
+            var operator = previous();
+            var right;
+
+            if(operator.type == LEFT_PAREN_TOKTYPE){
+                right = parse_expr();
+            }else{
+                right = parse_exp_expr();
+            }
+
+            if(operator.type == LEFT_PAREN_TOKTYPE){
+                consume(RIGHT_PAREN_TOKTYPE, "Expect ')'");
+            }
+
+            var e = binary_expr(left, operator, right);
+            left = expr(BINARY_EXPRTYPE, e);
+        }
+
+        return left;
+    }
+
+    fn parse_exp_expr(){
+        var left = parse_unary_expr();
+
+        while(match([EXPR_TOKTYPE])){
+            var operator = previous();
+            var right = parse_unary_expr();
+
+            var e = binary_expr(left, operator, right);
+            left = expr(BINARY_EXPRTYPE, e);
+        }
+
+        return left;
+    }
+
+    fn parse_unary_expr(){
+        if(match([PLUS_TOKTYPE, MINUS_TOKTYPE])){
+            var operator = previous();
+            var right = parse_unary_expr();
+
+            var e = unary_expr(operator, right);
+
+            return expr(UNARY_EXPRTYPE, e);
+        }
+
+        return parse_literl_expr();
+    }
+
+    fn parse_literl_expr(){
+        if(match([NUMBER_TOKTYPE])){
+            var tk = previous();
+            var e = literal(tk.literal);
+
+            return expr(LITERAL_EXPRTYPE, e);
+        }
+
+        if(match([LEFT_PAREN_TOKTYPE])){
+            var e = group_expr(parse_expr());
+
+            consume(RIGHT_PAREN_TOKTYPE, "Expect ')' at end of group expression");
+
+            return expr(GROUP_EXPRTYPE, e);
+        }
+
+        panic("Expected something, but got: " + to_str(peek().lexeme));
+    }
+
+    fn parse(tokens){
+        this.current = 0;
+        this.tokens = tokens;
+        this.exprs = list();
+
+        while(!is_at_end()){
+            exprs.insert(parse_expr());
+        }
+
+        return exprs;
+    }
+}
+
+class interpreter{
+    fn exp(base, exp){
+        var i = 0;
+        var value = 1;
+
+        while(i < exp){
+            value = value * base;
+            i = i + 1;
+        }
+
+        return value;
+    }
+
+    fn evaluate_binary(e){
+        var left = evaluate(e.left);
+        var operator = e.operator;
+        var right = evaluate(e.right);
+
+        if(operator.type == PLUS_TOKTYPE){
+            return left + right;
+        }elif(operator.type == MINUS_TOKTYPE){
+            return left - right;
+        }elif(operator.type == ASTERISK_TOKTYPE || operator.type == LEFT_PAREN_TOKTYPE){
+            return left * right;
+        }elif(operator.type == SLASH_TOKTYPE){
+            return left / right;
+        }elif(operator.type == EXPR_TOKTYPE){
+            return exp(left, right);
+        }else{
+            panic("Unknown expression type");
+        }
+    }
+
+    fn evaluate_unary(e){
+        var operator = e.operator;
+        var right = evaluate(e.right);
+
+        if(operator.type == PLUS_TOKTYPE){
+            if(right < 0){
+                return right * -1;
+            }
+
+            return right;
+        }elif(operator.type == MINUS_TOKTYPE){
+            return -right;
+        }
+
+        panic("Unknown expression type");
+    }
+
+    fn evaluate_group(e){
+        return evaluate(e.e);
+    }
+
+    fn evaluate_literal(e){
+        return e.value;
+    }
+
+    fn evaluate(e){
+        var type = e.type;
+
+        if(type == BINARY_EXPRTYPE){
+            return evaluate_binary(e.e);
+        }elif(type == UNARY_EXPRTYPE){
+            return evaluate_unary(e.e);
+        }elif(type == GROUP_EXPRTYPE){
+            return evaluate_group(e.e);
+        }elif(type == LITERAL_EXPRTYPE){
+            return evaluate_literal(e.e);
+        }else{
+            panic("Unknown expression type");
+        }
+    }
+
+    fn interpret(exprs){
+        this.exprs = exprs;
+
+        var i = 0;
+
+        while(i < exprs.size()){
+            var e = exprs.get(i);
+            var result = evaluate(e);
+
+            print result;
+
+            i = i + 1;
+        }
+    }
+}
+
+var input = "5 + 3 * 2 / 11";
+
+var s = scanner();
+var tokens = s.scan(input);
+
+var p = parser();
+var exprs = p.parse(tokens);
+
+var i = interpreter();
+i.interpret(exprs);
