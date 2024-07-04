@@ -167,7 +167,7 @@ public class Interpreter implements ExpressionVisitor<Object>, StatementVisitor<
             }
         }));
 
-        addNativeFunction("to_str", new String[]{"value"}, ((interpreter, arguments, leftParenthesis) -> arguments.get(0).toString()));
+        addNativeFunction("to_str", new String[]{"value"}, ((interpreter, arguments, leftParenthesis) -> Utils.stringify(arguments.get(0))));
 
         addNativeFunction("millis", new String[]{}, ((interpreter, arguments, leftParenthesis) -> System.currentTimeMillis()));
 

@@ -534,7 +534,7 @@ public class Parser {
             List<Statement> statements;
 
             consume(TokenType.LEFT_PARENTHESIS, "Expect '(' after 'elif' keyword.");
-            elifCondition = comparisonExpr();
+            elifCondition = logicalOr();
             consume(TokenType.RIGHT_PARENTHESIS, "Expect ')' at end of elif condition.");
 
             consume(TokenType.LEFT_BRACKET, "Expect '{' at start of if body.");
