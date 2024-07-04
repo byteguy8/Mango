@@ -1,0 +1,46 @@
+// *****EXPRESSIONS*****
+expr ::= assign
+assign ::= array "=" assignment | array
+
+array ::= "[" array_items "]" (":" term)? | logical_or
+array_items ::= array ("," array)*
+
+anon_fn ::= "(" anon_fn_params ")" "=>" "{" "}"
+anon_fn_params ::= IDENTIFIER ("," IDENTIFIER)*
+
+logical_or ::= comparison ("||" comparison)*
+logical_and ::= comparison ("&&" comparison)*
+
+comparison ::= term ("<" | ">" | "<=" | ">=" | "!=" | "==" | "!==" | "===" term)*
+term ::= factor ("+" | "-" factor)*
+factor ::= unary ("*" | "/" unary)*
+unary ::= ("-" | "!") unary | get
+
+get ::= (access | arr_access | call)* | this
+access ::= this "." IDENTIFIER
+arr_access ::= this "[" term "]"
+call ::= this "(" call_args ")"
+call_args ::= array ("," array)*
+
+this ::= "this" ("." IDENTIFIER)? | primary
+primary ::= NIL | FALSE | TRUE | STR | "(" expr ")" | IDENTIFIER
+
+// *****STATEMENTS*****
+program ::= statement*
+statement ::= print_stmt | return_stmt | break_stmt | continue_stmt | block_stmt | if_stmt | while_stmt | expr_stmt | declarative_stmt
+
+print_stmt ::= "print" expr ";"
+return_stmt ::= "return" expr? ";"
+break_stmt ::= "break" ";"
+break_stmt ::= "continue" ";"
+block_stmt ::= "{" statement* "}"
+if_stmt ::= "if" "(" logical_or ")" block_stmt ("elif" "(" logical_or ")" block_stmt)* ("else" "{" block_stmt "}")?
+while_stmt ::= "while" "(" logical_or ")" block_stmt
+expr_stmt ::= expr ";"
+
+declarative ::= var_stmt | fn_stmt | class_stmt
+var_stmt ::= "var" IDENTIFIER ("=" expr)? ";"
+fn_stmt ::= "fn" IDENTIFIER "(" fn_stmt_params ")" block_stmt
+fn_stmt_params ::= IDENTIFIER ("," IDENTIFIER)*
+class_stmt ::= "class" IDENTIFIER "{" class_stmt_body "}"
+class_stmt_body ::= ("init" block_stmt)? fn_stmt*
