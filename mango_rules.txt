@@ -1,6 +1,6 @@
 // *****EXPRESSIONS*****
 expr ::= assign
-assign ::= array "=" assignment | array
+assign ::= array "=" assign | array
 
 array ::= "[" array_items "]" (":" term)? | logical_or
 array_items ::= array ("," array)*
@@ -8,7 +8,7 @@ array_items ::= array ("," array)*
 anon_fn ::= "(" anon_fn_params ")" "=>" "{" "}"
 anon_fn_params ::= IDENTIFIER ("," IDENTIFIER)*
 
-logical_or ::= comparison ("||" comparison)*
+logical_or ::= logical_and ("||" logical_and)*
 logical_and ::= equality ("&&" equality)*
 equality ::= comparison ("==" | "!=" | "===" | "!==" comparison)*
 comparison ::= term ("<" | ">" | "<=" | ">=" term)*
