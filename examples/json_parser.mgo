@@ -1,0 +1,775 @@
+class list{
+    init(){
+        this.ptr = 0;
+        this.buffer = []:8;
+    }
+
+    fn copy(from, to){
+        var from_len = len(from);
+
+        var i = 0;
+
+        while(i < from_len){
+            to[i] = from[i];
+
+            i = i + 1;
+        }
+    }
+
+    fn grow(){
+        var new_buffer = []:len(buffer) * 2;
+
+        copy(buffer, new_buffer);
+
+        buffer = new_buffer;
+    }
+
+    fn size(){
+        return ptr;
+    }
+
+    fn to_arr(){
+        var arr = []:size();
+
+        var i = 0;
+
+        while(i < size()){
+            arr[i] = get(i);
+            i = i + 1;
+        }
+
+        return arr;
+    }
+
+    fn insert(value){
+        if(ptr >= len(buffer)){
+            grow();
+        }
+
+        buffer[ptr] = value;
+
+        ptr = ptr + 1;
+    }
+
+    fn get(index){
+        if(index >= ptr){
+            panic("Index out of bounds");
+        }
+
+        return buffer[index];
+    }
+}
+
+//> token types
+var TRUE_TOKTYPE = 0;
+var FALSE_TOKTYPE = 1;
+var NULL_TOKTYPE = 2;
+var NUMBER_TOKTYPE = 3;
+var STRING_TOKTYPE = 4;
+var IDENTIFIER_TOKTYPE = 5;
+
+var MINUS_TOKTYPE = 6;
+var COLON_TOKTYPE = 7;
+var COMMA_TOKTYPE = 8;
+
+var LEFT_SQUARE_TOKTYPE = 9;
+var RIGHT_SQUARE_TOKTYPE = 10;
+
+var LEFT_BRACKET_TOKTYPE = 11;
+var RIGHT_BRACKET_TOKTYPE = 12;
+
+var EOF_TOKTYPE = 13;
+//< token types
+
+class token{
+    init(line, lexeme, literal, type){
+        this.line = line;
+        this.lexeme = lexeme;
+        this.literal = literal;
+        this.type = type;
+    }
+
+    fn token_str(){
+        print "line: " + to_str(line) + " lexeme: " + to_str(lexeme) + " literal: " + to_str(literal);
+    }
+}
+
+class scanner{
+    fn compare_chars(a, b){
+        return char_code(a) == char_code(b);
+    }
+
+    fn char_to_digit(c){
+        return char_code(c) - 48;
+    }
+
+    fn is_at_end(){
+        return current >= len(source);
+    }
+
+    fn is_digit(c){
+        var code = char_to_digit(c);
+
+        return code >= 0 && code <= 9;
+    }
+
+    fn is_alpha(c){
+        var code = char_code(c);
+
+        return (code >= 65 && code <= 90) ||
+               (code >= 97 && code <= 122);
+    }
+
+    fn advance(){
+        if(is_at_end()){
+            return "\0";
+        }
+
+        var ptr = current;
+        current = current + 1;
+
+        return source[ptr];
+    }
+
+    fn peek(){
+        if(is_at_end()){
+            return "\0";
+        }
+
+        return source[current];
+    }
+
+    fn match(c){
+        if(compare_chars(peek(), c)){
+            advance();
+            return true;
+        }
+
+        return false;
+    }
+
+    fn add_token_literal(type, literal){
+        var lexeme = sub_str(source, start, current - 1);
+        var tk = token(line, lexeme, literal, type);
+
+        tokens.insert(tk);
+    }
+
+    fn add_token(type){
+        add_token_literal(type, nil);
+    }
+
+    fn number(){
+        while(is_digit(peek())){
+            advance();
+        }
+
+        if(compare_chars(peek(), ".")){
+            advance();
+
+            while(is_digit(peek())){
+                advance();
+            }
+        }
+
+        var raw_literal = sub_str(source, start, current - 1);
+        var literal = to_float(raw_literal);
+
+        add_token_literal(NUMBER_TOKTYPE, literal);
+    }
+
+    fn string(){
+        while(!is_at_end() && !compare_chars(peek(), '"')){
+            if(compare_chars(advance(), "\n")){
+                line = line + 1;
+            }
+        }
+
+        if(!compare_chars(peek(), '"')){
+            panic("Illegal string. Unterminated");
+        }
+
+        advance();
+
+        var str = sub_str(source, start + 1, current - 2);
+        add_token_literal(STRING_TOKTYPE, str);
+    }
+
+    fn keyword(){
+        while(!is_at_end() && is_alpha(peek())){
+            advance();
+        }
+
+        var kw = sub_str(source, start, current - 1);
+
+        if(kw === "false"){
+            add_token(FALSE_TOKTYPE);
+        }elif(kw === "true"){
+            add_token(TRUE_TOKTYPE);
+        }elif(kw === "null"){
+            add_token(NULL_TOKTYPE);
+        }else{
+            panic("Unknown token. Expect 'false', 'true', 'null'. But got: " + kw);
+        }
+    }
+
+    fn scan_token(){
+        var c = advance();
+
+        if(compare_chars(c, "-")){
+            add_token(MINUS_TOKTYPE);
+        }elif(compare_chars(c, ":")){
+            add_token(COLON_TOKTYPE);
+        }elif(compare_chars(c, ",")){
+            add_token(COMMA_TOKTYPE);
+        }elif(compare_chars(c, "[")){
+            add_token(LEFT_SQUARE_TOKTYPE);
+        }elif(compare_chars(c, "]")){
+            add_token(RIGHT_SQUARE_TOKTYPE);
+        }elif(compare_chars(c, "{")){
+            add_token(LEFT_BRACKET_TOKTYPE);
+        }elif(compare_chars(c, "}")){
+            add_token(RIGHT_BRACKET_TOKTYPE);
+        }elif(compare_chars(c, " ")){
+            return;
+        }elif(compare_chars(c, "\t")){
+            return;
+        }elif(compare_chars(c, "\n")){
+            line = line + 1;
+        }else{
+            if(is_digit(c)){
+                number();
+            }elif(compare_chars(c, '"')){
+                string();
+            }elif(is_alpha(c)){
+                keyword();
+            }else{
+                panic("Unknown token: " + c + " - " + to_str(char_code(c)) + " at line " + to_str(line));
+            }
+        }
+    }
+
+    fn scan(source){
+        this.line = 1;
+        this.start = 0;
+        this.current = 0;
+        this.source = source;
+        this.tokens = list();
+
+        while(!is_at_end()){
+            scan_token();
+            start = current;
+        }
+
+        tokens.insert(token(line, nil, nil, EOF_TOKTYPE));
+
+        return tokens;
+    }
+}
+
+class json_object{
+    init(values){
+        this.values = values;
+    }
+
+    fn find_key(key){
+        var i = 0;
+
+        while(i < len(values)){
+            var key_value = values[i];
+
+            if(key_value.key === key){
+                return key_value.value;
+            }
+
+            var target = key_value.find_key(key);
+
+            if(target){
+                return target;
+            }
+
+            i = i + 1;
+        }
+
+        return nil;
+    }
+}
+
+class json_arr{
+    init(values){
+        this.values = values;
+    }
+
+    fn find_key(key){
+        var i = 0;
+
+        while(i < len(values)){
+            var value = values[i];
+
+            if(is(json_object, value) || is(json_arr, value)){
+                var target = value.find_key(key);
+
+                if(target){
+                    return target;
+                }
+            }
+
+            i = i + 1;
+        }
+
+        return nil;
+    }
+}
+
+class json_key_value{
+    init(key, value){
+        this.key = key;
+        this.value = value;
+    }
+
+    fn find_key(key){
+        if(is(json_arr, value) || is(json_object, value)){
+            return value.find_key(key);
+        }
+
+        return nil;
+    }
+}
+
+class parser{
+    fn is_at_end(){
+        return tokens.get(current).type == EOF_TOKTYPE;
+    }
+
+    fn peek(){
+        return tokens.get(current);
+    }
+
+    fn previous(){
+        return tokens.get(current - 1);
+    }
+
+    fn advance(){
+        var ptr = current;
+
+        current = current + 1;
+
+        return tokens.get(ptr);
+    }
+
+    fn match(types){
+        var token = peek();
+
+        var i = 0;
+
+        while(i < len(types)){
+            if(types[i] == token.type){
+                advance();
+                return true;
+            }
+
+            i = i + 1;
+        }
+
+        return false;
+    }
+
+    fn check(type){
+        return peek().type == type;
+    }
+
+    fn consume(type, err_msg){
+        var tk = peek();
+
+        if(type == tk.type){
+            advance();
+            return tk;
+        }
+
+        panic(err_msg);
+    }
+
+    fn parse_json(){
+        return parse_arr();
+    }
+
+    fn parse_arr(){
+        if(match([LEFT_SQUARE_TOKTYPE])){
+            var values = list();
+
+            if(!check(RIGHT_SQUARE_TOKTYPE)){
+                while(true){
+                    var value = parse_arr();
+                    values.insert(value);
+
+                    if(!match([COMMA_TOKTYPE])){
+                        break;
+                    }
+                }
+            }
+
+            consume(RIGHT_SQUARE_TOKTYPE, "Expect ']' at end of array declaration.");
+
+            return json_arr(values.to_arr());
+        }
+
+        return parse_obj();
+    }
+
+    fn parse_obj(){
+        if(match([LEFT_BRACKET_TOKTYPE])){
+            var values = list();
+
+            if(!check(RIGHT_BRACKET_TOKTYPE)){
+                while(true){
+                    var value = parse_key_value();
+                    values.insert(value);
+
+                    if(!match([COMMA_TOKTYPE])){
+                        break;
+                    }
+                }
+            }
+
+            consume(RIGHT_BRACKET_TOKTYPE, "Expect '}' at end of object declaration.");
+
+            return json_object(values.to_arr());
+        }
+
+        return parse_value();
+    }
+
+    fn parse_key_value(){
+        var key = consume(STRING_TOKTYPE, "Expect string as field name.");
+
+        consume(COLON_TOKTYPE, "Expect ':' after field name.");
+
+        var value = parse_value();
+
+        return json_key_value(key.literal, value);
+    }
+
+    fn parse_value(){
+        if(match([NULL_TOKTYPE])){
+            return nil;
+        }
+
+        if(match([FALSE_TOKTYPE])){
+            return false;
+        }
+
+        if(match([TRUE_TOKTYPE])){
+            return true;
+        }
+
+        if(match([MINUS_TOKTYPE])){
+            var number_token = consume(NUMBER_TOKTYPE, "Expect number after '-'");
+            return number_token.literal - 1.0;
+        }
+
+        if(match([NUMBER_TOKTYPE, STRING_TOKTYPE])){
+            return previous().literal;
+        }
+
+        if(check(LEFT_SQUARE_TOKTYPE) || check(LEFT_BRACKET_TOKTYPE)){
+            return parse_json();
+        }
+
+        panic("Expected 'null', 'false', 'true', number, '[', '{', but got: " + to_str(peek().lexeme));
+    }
+
+    fn parse(tokens){
+        this.current = 0;
+        this.tokens = tokens;
+
+        return parse_json();
+    }
+}
+
+// used https://json-generator.com to generate this json
+
+var input = '
+[
+  {
+    "_id": "66899a477e7a5dd69cf3ba8e",
+    "index": 0,
+    "guid": "77ab935d-b713-4a28-837e-7128be838619",
+    "isActive": true,
+    "balance": "$2,501.24",
+    "picture": "http://placehold.it/32x32",
+    "age": 20,
+    "eyeColor": "brown",
+    "name": "Black Murphy",
+    "gender": "male",
+    "company": "ZIDANT",
+    "email": "blackmurphy@zidant.com",
+    "phone": "+1 (977) 561-3552",
+    "address": "486 Gerald Court, Roland, North Carolina, 5082",
+    "about": "Esse dolor esse eiusmod excepteur voluptate est et ad reprehenderit qui esse elit consequat. Nisi magna culpa reprehenderit velit nulla. Lorem ullamco nisi sint duis occaecat nisi excepteur ipsum. Elit fugiat voluptate magna do occaecat duis irure in. Do ad aliqua irure non in consectetur deserunt voluptate eu pariatur. Velit incididunt et eiusmod dolor.\r\n",
+    "registered": "2017-05-23T12:36:59 +04:00",
+    "latitude": 42.198755,
+    "longitude": 37.652527,
+    "tags": [
+      "cillum",
+      "aliquip",
+      "laboris",
+      "quis",
+      "tempor",
+      "anim",
+      "laboris"
+    ],
+    "friends": [
+      {
+        "id": 0,
+        "name": "Meagan Benton"
+      },
+      {
+        "id": 1,
+        "name": "Sanchez Knowles"
+      },
+      {
+        "id": 2,
+        "name": "Gladys Oliver"
+      }
+    ],
+    "greeting": "Hello, Black Murphy! You have 10 unread messages.",
+    "favoriteFruit": "banana"
+  },
+  {
+    "_id": "66899a479604036e2178950d",
+    "index": 1,
+    "guid": "e278cb6d-4bc8-4780-b27a-1f5185581c2b",
+    "isActive": true,
+    "balance": "$2,879.24",
+    "picture": "http://placehold.it/32x32",
+    "age": 28,
+    "eyeColor": "green",
+    "name": "Sharlene Rutledge",
+    "gender": "female",
+    "company": "MARKETOID",
+    "email": "sharlenerutledge@marketoid.com",
+    "phone": "+1 (924) 448-2401",
+    "address": "907 Lincoln Place, Chloride, South Dakota, 3256",
+    "about": "Sint excepteur pariatur elit qui fugiat consectetur nisi nisi. Eiusmod mollit tempor ex velit et quis aliquip ut. Non ad ea deserunt nisi cillum laborum officia mollit anim officia. Voluptate aliquip esse proident tempor. Aute aliquip velit sint eiusmod.\r\n",
+    "registered": "2019-07-18T08:00:02 +04:00",
+    "latitude": 88.268086,
+    "longitude": -35.883431,
+    "tags": [
+      "pariatur",
+      "exercitation",
+      "magna",
+      "est",
+      "aute",
+      "consectetur",
+      "adipisicing"
+    ],
+    "friends": [
+      {
+        "id": 0,
+        "name": "Faulkner Montgomery"
+      },
+      {
+        "id": 1,
+        "name": "Maura Mcmahon"
+      },
+      {
+        "id": 2,
+        "name": "Fitzpatrick Edwards"
+      }
+    ],
+    "greeting": "Hello, Sharlene Rutledge! You have 1 unread messages.",
+    "favoriteFruit": "apple"
+  },
+  {
+    "_id": "66899a473f622d426813ec7c",
+    "index": 2,
+    "guid": "640e7a00-8216-4ea3-b4cb-f393042c06d2",
+    "isActive": false,
+    "balance": "$3,972.87",
+    "picture": "http://placehold.it/32x32",
+    "age": 35,
+    "eyeColor": "blue",
+    "name": "Marcia Langley",
+    "gender": "female",
+    "company": "EARTHPURE",
+    "email": "marcialangley@earthpure.com",
+    "phone": "+1 (922) 510-2256",
+    "address": "673 Harwood Place, Barrelville, Florida, 5266",
+    "about": "Nostrud deserunt proident cupidatat elit cillum dolore voluptate proident sit veniam non. Nulla labore nisi excepteur qui. Tempor velit tempor qui voluptate ullamco nulla excepteur excepteur pariatur. Minim cillum tempor nulla dolore eiusmod voluptate fugiat amet enim tempor consectetur dolore duis. Nostrud culpa fugiat culpa Lorem elit est laborum cupidatat ad. Mollit sunt incididunt adipisicing est velit anim do. Ullamco est aliqua non do.\r\n",
+    "registered": "2017-12-06T10:33:59 +04:00",
+    "latitude": -77.294892,
+    "longitude": 72.606153,
+    "tags": [
+      "magna",
+      "ut",
+      "Lorem",
+      "fugiat",
+      "culpa",
+      "culpa",
+      "deserunt"
+    ],
+    "friends": [
+      {
+        "id": 0,
+        "name": "Mcgee Whitley"
+      },
+      {
+        "id": 1,
+        "name": "Rasmussen Macdonald"
+      },
+      {
+        "id": 2,
+        "name": "Jefferson Calderon"
+      }
+    ],
+    "greeting": "Hello, Marcia Langley! You have 6 unread messages.",
+    "favoriteFruit": "strawberry"
+  },
+  {
+    "_id": "66899a47145a395dac379fbc",
+    "index": 3,
+    "guid": "da0bde8e-5ebf-4bfc-aa00-b815f70dbb68",
+    "isActive": true,
+    "balance": "$3,663.10",
+    "picture": "http://placehold.it/32x32",
+    "age": 20,
+    "eyeColor": "brown",
+    "name": "Meyer Brown",
+    "gender": "male",
+    "company": "UNQ",
+    "email": "meyerbrown@unq.com",
+    "phone": "+1 (855) 541-3177",
+    "address": "552 Ditmars Street, Deercroft, Georgia, 919",
+    "about": "Sint qui ad excepteur veniam. Eu duis elit fugiat qui exercitation culpa nulla deserunt eiusmod. Do Lorem incididunt voluptate enim esse consequat elit. Deserunt tempor exercitation cillum enim cillum incididunt commodo minim. Fugiat fugiat nisi sit dolore reprehenderit do.\r\n",
+    "registered": "2016-05-08T03:49:58 +04:00",
+    "latitude": -80.090091,
+    "longitude": 169.604597,
+    "tags": [
+      "non",
+      "ea",
+      "deserunt",
+      "irure",
+      "magna",
+      "ex",
+      "cupidatat"
+    ],
+    "friends": [
+      {
+        "id": 0,
+        "name": "Hamilton Swanson"
+      },
+      {
+        "id": 1,
+        "name": "Della Valentine"
+      },
+      {
+        "id": 2,
+        "name": "Hewitt Ayala"
+      }
+    ],
+    "greeting": "Hello, Meyer Brown! You have 10 unread messages.",
+    "favoriteFruit": "apple"
+  },
+  {
+    "_id": "66899a47be27d84a49b39760",
+    "index": 4,
+    "guid": "477dc041-3802-4a36-ba21-30dd51fd5402",
+    "isActive": false,
+    "balance": "$3,088.24",
+    "picture": "http://placehold.it/32x32",
+    "age": 20,
+    "eyeColor": "green",
+    "name": "Meadows Lambert",
+    "gender": "male",
+    "company": "ANDRYX",
+    "email": "meadowslambert@andryx.com",
+    "phone": "+1 (941) 528-3174",
+    "address": "125 Barwell Terrace, Loyalhanna, Hawaii, 1125",
+    "about": "Deserunt aliquip sit pariatur dolor adipisicing laboris nulla id excepteur. Ut voluptate nisi in elit minim do culpa esse eiusmod adipisicing irure. Nisi irure consectetur cillum sint non ad id laborum duis voluptate.\r\n",
+    "registered": "2023-04-19T12:24:45 +04:00",
+    "latitude": 36.544133,
+    "longitude": 109.767249,
+    "tags": [
+      "commodo",
+      "amet",
+      "laborum",
+      "voluptate",
+      "reprehenderit",
+      "veniam",
+      "aliqua"
+    ],
+    "friends": [
+      {
+        "id": 0,
+        "name": "Chasity Everett"
+      },
+      {
+        "id": 1,
+        "name": "Isabella Alford"
+      },
+      {
+        "id": 2,
+        "name": "Karina Chen"
+      }
+    ],
+    "greeting": "Hello, Meadows Lambert! You have 4 unread messages.",
+    "favoriteFruit": "banana"
+  },
+  {
+    "_id": "66899a475732c33be213c495",
+    "index": 5,
+    "guid": "f5b7601e-56e5-49fb-8957-92bb7d100bc0",
+    "isActive": false,
+    "balance": "$2,161.96",
+    "picture": "http://placehold.it/32x32",
+    "age": 31,
+    "eyeColor": "green",
+    "name": "Janie Salinas",
+    "gender": "female",
+    "company": "XELEGYL",
+    "email": "janiesalinas@xelegyl.com",
+    "phone": "+1 (987) 469-3735",
+    "address": "241 Nichols Avenue, Nipinnawasee, Oregon, 7752",
+    "about": "Veniam non voluptate fugiat ea mollit consequat labore non cillum anim ea. Ipsum quis Lorem dolor amet minim consequat reprehenderit nisi sit. Quis incididunt dolore sunt officia esse sunt. Cillum sint exercitation est cupidatat.\r\n",
+    "registered": "2014-05-24T06:15:38 +04:00",
+    "latitude": 42.621834,
+    "longitude": 172.605665,
+    "tags": [
+      "reprehenderit",
+      "eiusmod",
+      "voluptate",
+      "Lorem",
+      "exercitation",
+      "cupidatat",
+      "minim"
+    ],
+    "friends": [
+      {
+        "id": 0,
+        "name": "Alicia Joyce"
+      },
+      {
+        "id": 1,
+        "name": "Stout Dickerson"
+      },
+      {
+        "id": 2,
+        "name": "Watkins Avila"
+      }
+    ],
+    "greeting": "Hello, Janie Salinas! You have 8 unread messages.",
+    "favoriteFruit": "apple"
+  }
+]
+';
+
+var s = scanner();
+var tokens = s.scan(input);
+
+var p = parser();
+var json = p.parse(tokens);
+
+var friends = json.values[len(json.values) - 1].find_key("friends");
+var friend_1 = friends.values[1];
+
+print friend_1.values[1].value;

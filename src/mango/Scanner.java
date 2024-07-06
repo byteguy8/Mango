@@ -105,13 +105,13 @@ public class Scanner {
         addToken(literal, type);
     }
 
-    private void string() {
-        while (!isAtEnd() && peek() != '"') {
+    private void string(char delimiter) {
+        while (!isAtEnd() && peek() != delimiter) {
             if (advance() == '\n')
                 line++;
         }
 
-        if (peek() != '"')
+        if (peek() != delimiter)
             Mango.error(line, "Unterminated string");
 
         advance();
@@ -265,8 +265,8 @@ public class Scanner {
             default: {
                 if (isDigit(c))
                     number();
-                else if (c == '"')
-                    string();
+                else if (c == '"' || c == '\'')
+                    string(c);
                 else if (isAlphaNumeric(c))
                     identifier();
                 else

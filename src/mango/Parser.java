@@ -5,6 +5,7 @@ import mango.statement.*;
 
 import java.util.ArrayList;
 import java.util.List;
+
 public class Parser {
     private int current;
     private List<Token> tokens;

@@ -784,7 +784,8 @@ public class Interpreter implements ExpressionVisitor<Object>, StatementVisitor<
     }
 
     private boolean isComposed(Object value) {
-        return value instanceof MangoArray ||
+        return value instanceof String ||
+                value instanceof MangoArray ||
                 value instanceof MangoFunction ||
                 value instanceof MangoMethod ||
                 value instanceof MangoClass ||
