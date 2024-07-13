@@ -134,6 +134,9 @@ public class Parser {
             if (!match(TokenType.LEFT_PARENTHESIS))
                 return false;
 
+            if (!check(TokenType.IDENTIFIER, TokenType.RIGHT_PARENTHESIS))
+                return false;
+
             if (!check(TokenType.RIGHT_PARENTHESIS)) {
                 do {
                     if (match(TokenType.COMMA))
@@ -356,7 +359,11 @@ public class Parser {
 
         if (match(TokenType.LEFT_PARENTHESIS)) {
             Token parenthesisToken = previous();
-            Expression expression = expression();
+            Expression expression = null;
+
+            if (!check(TokenType.RIGHT_PARENTHESIS))
+                expression = expression();
+
             consume(TokenType.RIGHT_PARENTHESIS, "Expect ')' at end of group expression.");
 
             return new GroupExpr(parenthesisToken, expression);

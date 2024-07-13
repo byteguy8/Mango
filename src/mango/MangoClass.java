@@ -32,17 +32,21 @@ public class MangoClass implements MangoCallable {
         MangoInstance instance = new MangoInstance(this, instanceEnvironment);
 
         for (Map.Entry<String, MangoFunction> entry : functions.entrySet())
-            instanceEnvironment.create(entry.getKey(), new MangoMethod(instance, entry.getValue()));
+            instanceEnvironment.create(entry.getKey(), new MangoMethod(instance, entry.getValue(), false));
 
         if (constructor != null) {
-            MangoMethod method = new MangoMethod(instance, constructor);
+            MangoMethod method = new MangoMethod(instance, constructor, true);
 
             MangoInstance previous = interpreter.getCurrentInstance();
+            MangoMethod previousMethod = interpreter.getCurrentMethod();
+
             interpreter.setCurrentInstance(instance);
+            interpreter.setCurrentMethod(method);
 
             method.call(interpreter, arguments, leftParenthesis);
 
             interpreter.setCurrentInstance(previous);
+            interpreter.setCurrentMethod(previousMethod);
         }
 
         return instance;

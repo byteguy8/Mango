@@ -10,6 +10,7 @@ import java.util.Stack;
 
 public class Interpreter implements ExpressionVisitor<Object>, StatementVisitor<Void> {
     private final static class Frame {
+        public int whileBlocks;
         public final Token leftParenthesis;
         public final String name;
 
@@ -333,7 +334,10 @@ public class Interpreter implements ExpressionVisitor<Object>, StatementVisitor<
 
     @Override
     public Object visitGroupExpr(GroupExpr expr) {
-        return evaluate(expr.expression);
+        if (expr.expression != null)
+            return evaluate(expr.expression);
+
+        return null;
     }
 
     @Override
@@ -645,6 +649,12 @@ public class Interpreter implements ExpressionVisitor<Object>, StatementVisitor<
 
     @Override
     public Void visitReturnStmt(ReturnStmt stmt) {
+        if (callStack.isEmpty())
+            throw error(stmt.returnToken, "Illegal use of return statement: Wrong scope.");
+
+        if (currentMethod != null && currentMethod.isConstructor())
+            throw error(stmt.returnToken, "Illegal use of return statement: Wrong scope.");
+
         Expression rawValue = stmt.value;
 
         if (rawValue != null)
@@ -736,6 +746,9 @@ public class Interpreter implements ExpressionVisitor<Object>, StatementVisitor<
         Expression conditionExpr = stmt.condition;
         List<Statement> body = stmt.body;
 
+        if (!callStack.isEmpty())
+            callStack.peek().whileBlocks++;
+
         try {
             while (truthly(evaluate(conditionExpr)))
                 executeWhileBlock(body);
@@ -743,16 +756,31 @@ public class Interpreter implements ExpressionVisitor<Object>, StatementVisitor<
             return null;
         }
 
+        if (!callStack.isEmpty())
+            callStack.peek().whileBlocks--;
+
         return null;
     }
 
     @Override
     public Void visitBreakStmt(BreakStmt stmt) {
+        if (callStack.isEmpty())
+            throw error(stmt.breakToken, "Can't use 'break' outside a loop scope.");
+
+        if (callStack.peek().whileBlocks == 0)
+            throw error(stmt.breakToken, "Can't use 'break' outside a loop scope.");
+
         throw new Break();
     }
 
     @Override
     public Void visitContinueStmt(ContinueStmt stmt) {
+        if (callStack.isEmpty())
+            throw error(stmt.continueToken, "Can't use 'continue' outside a loop scope.");
+
+        if (callStack.peek().whileBlocks == 0)
+            throw error(stmt.continueToken, "Can't use 'continue' outside a loop scope.");
+
         throw new Continue();
     }
 
@@ -762,6 +790,14 @@ public class Interpreter implements ExpressionVisitor<Object>, StatementVisitor<
 
     public void setCurrentInstance(MangoInstance currentInstance) {
         this.currentInstance = currentInstance;
+    }
+
+    public MangoMethod getCurrentMethod(){
+        return currentMethod;
+    }
+
+    public void setCurrentMethod(MangoMethod currentMethod) {
+        this.currentMethod = currentMethod;
     }
 
     private RuntimeError error(Token token, String message) {

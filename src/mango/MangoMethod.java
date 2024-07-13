@@ -7,13 +7,15 @@ import java.util.List;
 public class MangoMethod implements MangoCallable {
     private final MangoInstance instance;
     private final MangoFunction function;
+    private final boolean isConstructor;
 
-    public MangoMethod(MangoInstance instance, MangoFunction function) {
+    public MangoMethod(MangoInstance instance, MangoFunction function, boolean isConstructor) {
         if (instance == null)
             throw new IllegalArgumentException("instance must not be null");
 
         this.instance = instance;
         this.function = function;
+        this.isConstructor = isConstructor;
     }
 
     @Override
@@ -57,5 +59,9 @@ public class MangoMethod implements MangoCallable {
 
     public MangoInstance getInstance() {
         return instance;
+    }
+
+    public boolean isConstructor() {
+        return isConstructor;
     }
 }
